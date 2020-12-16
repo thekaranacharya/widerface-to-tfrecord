@@ -61,9 +61,10 @@ def parse_example(f, images_path):
     filename = f.readline().rstrip()
     if not filename:
         raise IOError()
+    
+    print("Filename: ", filename)
 
     filepath = os.path.join(images_path, filename)
-
     image_raw = cv2.imread(filepath)
 
     encoded_image_data = open(filepath, "rb").read()
@@ -72,53 +73,56 @@ def parse_example(f, images_path):
     height, width, channel = image_raw.shape
 
     face_num = int(f.readline().rstrip())
-    if not face_num:
-        raise Exception()
+    print(face_num)
 
-    for i in range(face_num):
-        annot = f.readline().rstrip().split()
-        if not annot:
-            raise Exception()
+    if (face_num == 0):
+      # skip the next line
+      next(f)
+    else:
+      for i in range(face_num):
+          annot = f.readline().rstrip().split()
+          if not annot:
+              raise Exception()
 
-        # WIDER FACE DATASET CONTAINS SOME ANNOTATIONS WHAT EXCEEDS THE IMAGE BOUNDARY
-        if(float(annot[2]) > 25.0):
-            if(float(annot[3]) > 30.0):
-                xmins.append( max(0.005, (float(annot[0]) / width) ) )
-                ymins.append( max(0.005, (float(annot[1]) / height) ) )
-                xmaxs.append( min(0.995, ((float(annot[0]) + float(annot[2])) / width) ) )
-                ymaxs.append( min(0.995, ((float(annot[1]) + float(annot[3])) / height) ) )
-                classes_text.append(b'face')
-                classes.append(1)
-                poses.append("front".encode('utf8'))
-                truncated.append(int(0))
+          # WIDER FACE DATASET CONTAINS SOME ANNOTATIONS WHAT EXCEEDS THE IMAGE BOUNDARY
+          if(float(annot[2]) > 25.0):
+              if(float(annot[3]) > 30.0):
+                  xmins.append( max(0.005, (float(annot[0]) / width) ) )
+                  ymins.append( max(0.005, (float(annot[1]) / height) ) )
+                  xmaxs.append( min(0.995, ((float(annot[0]) + float(annot[2])) / width) ) )
+                  ymaxs.append( min(0.995, ((float(annot[1]) + float(annot[3])) / height) ) )
+                  classes_text.append(b'face')
+                  classes.append(1)
+                  poses.append("front".encode('utf8'))
+                  truncated.append(int(0))
 
 
-    tf_example = tf.train.Example(features=tf.train.Features(feature={
-        'image/height': dataset_util.int64_feature(int(height)),
-        'image/width': dataset_util.int64_feature(int(width)),
-        'image/filename': dataset_util.bytes_feature(filename.encode('utf-8')),
-        'image/source_id': dataset_util.bytes_feature(filename.encode('utf-8')),
-        'image/key/sha256': dataset_util.bytes_feature(key.encode('utf8')),
-        'image/encoded': dataset_util.bytes_feature(encoded_image_data),
-        'image/format': dataset_util.bytes_feature('jpeg'.encode('utf8')),
-        'image/object/bbox/xmin': dataset_util.float_list_feature(xmins),
-        'image/object/bbox/xmax': dataset_util.float_list_feature(xmaxs),
-        'image/object/bbox/ymin': dataset_util.float_list_feature(ymins),
-        'image/object/bbox/ymax': dataset_util.float_list_feature(ymaxs),
-        'image/object/class/text': dataset_util.bytes_list_feature(classes_text),
-        'image/object/class/label': dataset_util.int64_list_feature(classes),
-        'image/object/difficult': dataset_util.int64_list_feature(int(0)),
-        'image/object/truncated': dataset_util.int64_list_feature(truncated),
-        'image/object/view': dataset_util.bytes_list_feature(poses),
+      tf_example = tf.train.Example(features=tf.train.Features(feature={
+          'image/height': dataset_util.int64_feature(int(height)),
+          'image/width': dataset_util.int64_feature(int(width)),
+          'image/filename': dataset_util.bytes_feature(filename.encode('utf-8')),
+          'image/source_id': dataset_util.bytes_feature(filename.encode('utf-8')),
+          'image/key/sha256': dataset_util.bytes_feature(key.encode('utf8')),
+          'image/encoded': dataset_util.bytes_feature(encoded_image_data),
+          'image/format': dataset_util.bytes_feature('jpeg'.encode('utf8')),
+          'image/object/bbox/xmin': dataset_util.float_list_feature(xmins),
+          'image/object/bbox/xmax': dataset_util.float_list_feature(xmaxs),
+          'image/object/bbox/ymin': dataset_util.float_list_feature(ymins),
+          'image/object/bbox/ymax': dataset_util.float_list_feature(ymaxs),
+          'image/object/class/text': dataset_util.bytes_list_feature(classes_text),
+          'image/object/class/label': dataset_util.int64_list_feature(classes),
+          'image/object/difficult': dataset_util.int64_list_feature(int(0)),
+          'image/object/truncated': dataset_util.int64_list_feature(truncated),
+          'image/object/view': dataset_util.bytes_list_feature(poses),
         }))
 
 
-    return tf_example
+      return tf_example
 
 
 def run(images_path, description_file, output_path, no_bbox=False):
     f = open(description_file)
-    writer = tf.python_io.TFRecordWriter(output_path)
+    writer = tf.compat.v1.python_io.TFRecordWriter(output_path)
 
     i = 0
 
@@ -130,8 +134,9 @@ def run(images_path, description_file, output_path, no_bbox=False):
             else:
                 tf_example = parse_example(f, images_path)
 
-            writer.write(tf_example.SerializeToString())
-            i += 1
+            if (tf_example):
+              writer.write(tf_example.SerializeToString())
+              i += 1
 
         except IOError:
             break
@@ -167,4 +172,4 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    tf.compat.v1.app.run()
